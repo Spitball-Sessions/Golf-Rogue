@@ -24,8 +24,8 @@ class GolfBall():
         def __init__(self, cx = 200,cy = 200):
             self.cx = cx
             self.cy = cy
-            self.vx = 150
-            self.vy = 150
+            self.vx = 0
+            self.vy = 0
             self.radius = 10
             self.circumference = 2*math.pi*self.radius
             self.area = math.pi*(self.radius*self.radius)
@@ -159,13 +159,13 @@ class GameView(arcade.Window):
         self.shot_meter_stage = 0
         self.shot_meter = 0
         self.shot_meter_direction = "Up"
-        self.shot_meter_display = arcade.Text(f"{self.shot_meter:.1f}",x = 200, y = 225)
+        self.shot_meter_display = arcade.Text(f"{self.shot_meter:.1f}",x = 1220, y = 40)
            
     def create_accuracy_meter(self):
         """Initializes the accuracy meter."""
         self.accuracy_meter = -50
         self.accuracy_meter_direction = "Up"
-        self.accuracy_meter_display = arcade.Text(f"{self.accuracy_meter:.1f}", x=200, y = 200)
+        self.accuracy_meter_display = arcade.Text(f"{self.accuracy_meter:.1f}", x=1220, y = 20)
 
     def setup(self):
         """
@@ -208,11 +208,6 @@ class GameView(arcade.Window):
 
     
     def on_mouse_press(self, x, y, button, modifiers):
-        self.shot_meter_display.x = x + 30
-        self.shot_meter_display.y = y
-
-        self.accuracy_meter_display.x = x + 30
-        self.accuracy_meter_display.y = y - 25
 
         if self.shot_meter_stage == 0:
             self.shot_meter_stage = 1
