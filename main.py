@@ -2,6 +2,7 @@ import arcade
 import logging
 import random
 import math
+from collections import namedtuple as nt
 
 #CONSTANTs
 SCREEN_WIDTH = 1280 #right edge
@@ -45,44 +46,40 @@ class GolfBall():
             self.cy += self.vy * change_y
             log.debug(f"circle_x = {self.cx}, circle_y = {self.cy}")
 
-        def locate_ball(self):
+        def locate_ball(self, left, bottom, width, height):
             self.position.text = f"Position: ({self.cx},{self.cy})"
 
-            edge_distance = 30
+            self.near_sides = (self.cx - self.radius) < left or (self.cx + self.radius) > (left+width)
+            self.near_top_bottom = (self.cy - self.radius) < bottom or (self.cy + self.radius) > (bottom+height)
 
-            near_top_bottom = self.cx < edge_distance or self.cx > SCREEN_WIDTH - edge_distance
-            near_sides = self.cy < edge_distance or self.cy > SCREEN_HEIGHT - edge_distance
-
-            bounce_top_bottom = self.cx < (edge_distance - 10)  or self.cx > SCREEN_WIDTH -  (edge_distance - 10)
-            bounce_sides = self.cy <  (edge_distance - 10) or self.cy > SCREEN_HEIGHT -  (edge_distance - 10)
-
-
-            if near_top_bottom or near_sides:
-                self.position.color = arcade.color.ORANGE
-                if bounce_top_bottom:
-                    self.vx = -1 * self.vx
-                if bounce_sides:
-                    self.vy = -1 * self.vy
-                else:
-                    pass
+        def ball_bounce(self):
+            if self.near_sides:
+                self.vx = -1 * self.vx
+            if self.near_top_bottom:
+                self.vy = -1 * self.vy
             else:
-                self.position.color = arcade.color.WHITE
+                pass
 
 
 class Level():
     def __init__(self):
-        self.room1 = self.create_room()
+        self.rooms = []
+        self.create_room()
 
     def create_room(self):
-        left = 100
-        bottom = 100
-        width = 600
-        height = 250
-        return (left, bottom, width, height)
+        Room = nt("Room",["left","bottom", "width", "height"])
+
+        left = random.randrange(50,300)
+        bottom = random.randrange(100,300)
+        width = random.randrange(200,600)
+        height = random.randrange(100,400)
+        room =  Room(left, bottom, width, height)
+        self.rooms.append(room)
+        log.info(f"Created room at: {room.left, room.bottom} that extends to {room.left+room.width, room.bottom + room.height}")
 
     def draw_room(self):
-        arcade.draw_lbwh_rectangle_filled(*self.room1,color=arcade.color.GRANNY_SMITH_APPLE)
-
+        for room in self.rooms:
+            arcade.draw_lbwh_rectangle_filled(*room,color=arcade.color.GRANNY_SMITH_APPLE)
 
 
 class GameView(arcade.Window):
@@ -94,27 +91,52 @@ class GameView(arcade.Window):
         #Call to set up window:
         super().__init__(SCREEN_WIDTH,SCREEN_HEIGHT,WINDOW_TITLE)
         self.background_color = arcade.csscolor.BLACK
-        self.room = Level()
+        self.test_text = arcade.Text("",x = 400, y = 400)
+        
            
 
     def setup(self):
         """
         Set up the core game here.  Call to restart game.
         """
-        self.golf_ball = GolfBall(200,200)    
-        self.room
+        self.level = Level()
+        gbx = self.level.rooms[0].left + 40
+        gby = self.level.rooms[0].bottom + 40
+        
+        self.golf_ball = GolfBall(gbx,gby)    
 
     def on_update(self, delta_time) -> None:
         self.golf_ball.move_ball(delta_time,delta_time)
-        self.golf_ball.locate_ball()
-
-        pass
+        for room in self.level.rooms:
+            self.golf_ball.locate_ball(*room)
+        self.golf_ball.ball_bounce()
+        
 
     def on_draw(self):
         self.clear()
-        self.room.draw_room()
+        self.level.draw_room()
         self.golf_ball.draw()
         self.golf_ball.position.draw()
+        self.test_text.draw()
+
+    def on_key_press(self, key, modifiers):
+        if key == arcade.key.ESCAPE:
+            self.setup()
+
+    def on_mouse_motion(self, x, y, dx, dy):
+        pass
+
+    
+    def on_mouse_press(self, x, y, button, modifiers):
+        self.golf_ball.vx = ((x - (SCREEN_WIDTH/2)) /3)
+        self.golf_ball.vy = ((y - (SCREEN_HEIGHT/2)) /3)
+
+        self.test_text.text = f"golf ball velocity is {self.golf_ball.vx, self.golf_ball.vy}"
+        self.test_text.x = x
+        self.test_text.y = y
+  
+    
+
         
 
         
