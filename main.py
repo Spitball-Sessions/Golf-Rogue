@@ -106,7 +106,21 @@ class GameView(arcade.Window):
         super().__init__(SCREEN_WIDTH,SCREEN_HEIGHT,WINDOW_TITLE)
         self.background_color = arcade.csscolor.BLACK
         self.test_text = arcade.Text("",x = 400, y = 400)
-   
+
+    def set_aim(self, x, y):
+        '''
+        Calculates angle of shot based on mouse location relative to the ball.  (Tangent of (mouse.y - ball),(mouse.x - ball))
+        Args:
+        * x = mouse x
+        * y = mouse y
+        '''
+        self.aim_position = (x,y)
+        dx = x - self.center_x
+        dy = y - self.center_y
+        radians = math.atan2(dy, dx)
+        self.aim_degrees = math.degrees(radians)
+        self.aim_meter.text = f"Aim: {self.aim_degrees}"
+ 
     def change_shot_meter(self,delta_time):
         """
         Handles the Power and Accuracy meters.  Currently 5 stages - start, set power, start accuracy, set accuracy, reset. Will condense to 3 after debugging.
@@ -151,21 +165,34 @@ class GameView(arcade.Window):
             self.shot_meter_display.text = f"{self.shot_meter:.1f}"
             self.accuracy_meter_display.text = f"{self.accuracy_meter:.1f}"
 
-    def create_shot_meter(self):
+
+    def create_meters(self):
         """
-        Initializes the shot meter. 
-        * Stage affects click.
+        Initializes shot, accuracy and aim meters. 
         """
+        #Shot Meter Stage affects swing meter.
         self.shot_meter_stage = 0
+        #Shot Meter is Power
         self.shot_meter = 0
         self.shot_meter_direction = "Up"
         self.shot_meter_display = arcade.Text(f"{self.shot_meter:.1f}",x = 1220, y = 40)
-           
-    def create_accuracy_meter(self):
-        """Initializes the accuracy meter."""
+
+        #accuracy meter is curve
         self.accuracy_meter = -50
         self.accuracy_meter_direction = "Up"
         self.accuracy_meter_display = arcade.Text(f"{self.accuracy_meter:.1f}", x=1220, y = 20)
+    
+        #aim is positional
+        self.aim_position = (0,0)
+        self.aim_degrees = 0
+        self.aim_meter = arcade.Text(f"Aim: {self.aim_degrees}", x = 20, y = 20)
+
+    def draw_meters(self):
+        self.golf_ball.position.draw()
+        self.shot_meter_display.draw()
+        self.accuracy_meter_display.draw()
+        self.aim_meter.draw()
+
 
     def setup(self):
         """
@@ -176,9 +203,8 @@ class GameView(arcade.Window):
         gby = self.level.rooms[0].bottom + 40
         
         self.golf_ball = GolfBall(gbx,gby)    
-
-        self.create_accuracy_meter()
-        self.create_shot_meter()
+ 
+        self.create_meters()
 
 
     def on_update(self, delta_time) -> None:
@@ -195,9 +221,7 @@ class GameView(arcade.Window):
         self.clear()
         self.level.draw_room()
         self.golf_ball.draw()
-        self.golf_ball.position.draw()
-        self.shot_meter_display.draw()
-        self.accuracy_meter_display.draw()
+        self.draw_meters()
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.ESCAPE:
@@ -205,12 +229,12 @@ class GameView(arcade.Window):
 
     def on_mouse_motion(self, x, y, dx, dy):
         pass
-
     
     def on_mouse_press(self, x, y, button, modifiers):
 
         if self.shot_meter_stage == 0:
             self.shot_meter_stage = 1
+            self.set_aim(x,y)
         elif self.shot_meter_stage == 1:
             self.shot_meter_stage = 2
         elif self.shot_meter_stage == 2:
@@ -219,6 +243,8 @@ class GameView(arcade.Window):
             self.shot_meter_stage = 4
         elif self.shot_meter_stage == 4:
             self.shot_meter_stage = 0
+
+
 
 
 
