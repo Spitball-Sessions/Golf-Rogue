@@ -7,6 +7,7 @@ SCREEN_HEIGHT = 720 #top edge
 #(0,0) is bottom left.  (1280,720) is top right
 WINDOW_TITLE = "Golf Game"
 LOG_LEVEL = "INFO"
+FRICTION = .98
 
 
 def start_logging():
@@ -27,6 +28,7 @@ class GolfBall():
             self.vx = 0
             self.vy = 0
             self.radius = 10
+            self.apply_friction = False
             self.circumference = 2*math.pi*self.radius
             self.area = math.pi*(self.radius*self.radius)
             self.position = arcade.Text(f"Position: ({self.cx},{self.cy})", x = 20, y = SCREEN_HEIGHT - 20)
@@ -45,28 +47,42 @@ class GolfBall():
                     * Change_x = x-axis velocity * delta_time 
                     * Change_y = y-axis velocity * delta_time
                 """
-            self.cx += self.vx * delta_time
+
+            self.cx += self.vx * delta_time 
             self.cy += self.vy * delta_time
+
+            if self.apply_friction:
+                self.vy = self.vy * FRICTION
+                self.vx = self.vx * FRICTION
+
+            if self.vy < abs(3) and self.vx < abs(3):
+                self.cx += 0
+                self.cy += 0
+                self.vy = 0
+                self.vx = 0
+                self.apply_friction = False
+
+            self.position.text = (f"vx = {self.vx}, vy = {self.vy}")
             log.debug(f"vx = {self.vx}, vy = {self.vy}")
 
-        def ball_bounce(self, left, bottom, width, height):
+        def handle_collisions(self, left, bottom, width, height):
             """
             If collision detected, this inverts the velocity for the direction collision is detected on.
             Dual if's allow for handling corners.
             """
-            self.position.text = f"Position: ({self.cx},{self.cy})"
+            #self.position.text = f"Position: ({self.cx},{self.cy})"
 
             self.near_sides = (self.cx - self.radius) < left or (self.cx + self.radius) > (left+width)
             self.near_top_bottom = (self.cy - self.radius) < bottom or (self.cy + self.radius) > (bottom+height)
 
             if self.near_sides:
-                log.info("near sides")
+                log.debug("near sides")
                 self.vx = -1 * self.vx
-                log.info(f"new vx = {self.vx}")
+                log.debug(f"new vx = {self.vx}")
             if self.near_top_bottom:
-                log.info("near top/bottom")
+                log.debug("near top/bottom")
                 self.vy = -1 * self.vy
-                log.info(f"new_vy = {self.vy}")
+                log.debug(f"new_vy = {self.vy}")
             else:
                 pass
 
@@ -102,6 +118,7 @@ class GameView(arcade.Window):
         super().__init__(SCREEN_WIDTH,SCREEN_HEIGHT,WINDOW_TITLE)
         self.background_color = arcade.csscolor.BLACK
         self.test_text = arcade.Text("",x = 400, y = 400)
+        self.timer = 0
 
     def set_aim(self, x, y):
         '''
@@ -114,9 +131,9 @@ class GameView(arcade.Window):
         dx = x - self.golf_ball.cx
         dy = y - self.golf_ball.cy
         self.radians = math.atan2(dy, dx)
-        self.aim_meter.text = f"Aim: {math.degrees(self.radians)}"
+        self.aim_meter_display.text = f"Aim: {math.degrees(self.radians)}"
  
-    def change_shot_meter(self,delta_time):
+    def update_shot_meter(self,delta_time):
         """
         Handles the Power and Accuracy meters.  Currently 5 stages - start, set power, start accuracy, set accuracy, reset. Will condense to 3 after debugging.
         """
@@ -178,23 +195,30 @@ class GameView(arcade.Window):
     
         #aim is positional
         self.aim_position = (0,0)
-        self.aim_degrees = 0
-        self.aim_meter = arcade.Text(f"Aim: {self.aim_degrees}", x = 20, y = 20)
+        self.aim_meter = 0
+        self.aim_meter_display = arcade.Text(f"Aim: {self.aim_meter}", x = 20, y = 20)
 
     def draw_meters(self):
         self.golf_ball.position.draw()
         self.power_meter_display.draw()
         self.accuracy_meter_display.draw()
-        self.aim_meter.draw()
+        self.aim_meter_display.draw()
 
     def launch_ball(self):
+        '''
+        The formulas to convert the golf swing to actually move the ball.
+        Takes offset, applies to angle (self.radians), then multiplies by power to get vector.  Vector is then applied during updates.
+        '''
         max_offset_degrees = 15
         offset_degrees = (self.accuracy_meter / 50) * max_offset_degrees
         adjusted_angle = self.radians + math.radians(offset_degrees)
+        log.info(f'Angle = {math.degrees(self.radians)}, Speed = {self.power_meter}, Accuracy = {self.accuracy_meter}, Adjusted angle = {math.degrees(adjusted_angle)}.')
 
         self.golf_ball.vx = math.cos(adjusted_angle) * self.power_meter * 5
         self.golf_ball.vy = math.sin(adjusted_angle) * self.power_meter * 5
+
         self.shot_meter_stage = 0
+
     
     def setup(self):
         """
@@ -210,19 +234,29 @@ class GameView(arcade.Window):
 
     def on_update(self, delta_time) -> None:
 
-
         for room in self.level.rooms:
-            self.golf_ball.ball_bounce(*room)
+            self.golf_ball.handle_collisions(*room)
 
+        if self.timer:
+            self.timer += 1*delta_time
+            self.test_text.text = f"{self.timer}"
+
+        if self.timer > 2.25:
+            self.timer = 0
+            self.golf_ball.apply_friction = True
+            
+        log.info(f"Friction = {self.golf_ball.apply_friction}")
         self.golf_ball.move_ball(delta_time)
+        self.update_shot_meter(delta_time)
 
-        self.change_shot_meter(delta_time)
+
 
     def on_draw(self):
         self.clear()
         self.level.draw_room()
         self.golf_ball.draw()
         self.draw_meters()
+        self.test_text.draw()
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.ESCAPE:
@@ -242,11 +276,7 @@ class GameView(arcade.Window):
             self.shot_meter_stage = 3
         elif self.shot_meter_stage == 3:
             self.launch_ball()
-
-
-
-
-
+            self.timer = 1
 
 
 
