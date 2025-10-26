@@ -37,49 +37,6 @@ class GolfBall():
 
         log.info(f"Golf ball created. " + ", ".join(f"{k} = {v}" for k,v in vars(self).items() if isinstance(v,( int,float))))
    
-    def update_shot_meter(self,delta_time):
-        """
-        Handles the Power and Accuracy meters.  Currently 5 stages - start, set power, start accuracy, set accuracy, reset. Will condense to 3 after debugging.
-        """
-        #When mouse is clicked, starts power bar.  Bar goes up till it hits 100, then goes back down.
-        if self.shot_meter_stage == 1:
-            if self.power_meter_direction == "Up":
-                self.power_meter +=.75+(1*delta_time)
-                if self.power_meter > 100:
-                    self.power_meter_direction = "Down"
-            if self.power_meter_direction == "Down":
-                self.power_meter -=.75 + (1*delta_time)
-                if self.power_meter < 0:
-                    self.power_meter_direction = "Up"
-            self.power_meter_display.text = f"{self.power_meter:.1f}"
-
-        #Second click freezes shot meter and displays power.
-        elif self.shot_meter_stage == 2:
-            self.power_meter = self.power_meter
-            self.power_meter_display.text = f"{self.power_meter:.1f}"
-
-        #Third click starts accuracy bar.  -50 = Hard Left, +50 = Hard Right
-        elif self.shot_meter_stage == 3:
-            if self.accuracy_meter_direction == "Up":
-                self.accuracy_meter +=.75+(1*delta_time)
-                if self.accuracy_meter > 50:
-                    self.accuracy_meter_direction = "Down"
-            elif self.accuracy_meter_direction == "Down":
-                self.accuracy_meter -=.75+(1*delta_time)
-                if self.accuracy_meter < -50:
-                    self.accuracy_meter_direction = "Up"
-            self.accuracy_meter_display.text = f"{self.accuracy_meter:.1f}"
-
-        
-            #Need to do math
-    
-        elif self.shot_meter_stage == 0:
-            #Resets meters
-            self.power_meter = 0
-            self.accuracy_meter = 0
-            self.power_meter_display.text = f"{self.power_meter:.1f}"
-            self.accuracy_meter_display.text = f"{self.accuracy_meter:.1f}"
-
     def create_meters(self):
         """
         Initializes shot, accuracy and aim meters. 
@@ -100,6 +57,46 @@ class GolfBall():
         self.aim_position = (0,0)
         self.aim_meter = 0
         self.aim_meter_display = arcade.Text(f"Aim: {self.aim_meter}", x = 20, y = 20)
+
+    def update_shot_meter(self,delta_time):
+        """
+        Handles the Power and Accuracy meters.  Currently 5 stages - start, set power, start accuracy, set accuracy, reset. Will condense to 3 after debugging.
+        """
+        #When mouse is clicked, starts power bar.  Bar goes up till it hits 100, then goes back down.
+        if self.shot_meter_stage == 2:
+            if self.power_meter_direction == "Up":
+                self.power_meter +=.75+(1*delta_time)
+                if self.power_meter > 100:
+                    self.power_meter_direction = "Down"
+            if self.power_meter_direction == "Down":
+                self.power_meter -=.75 + (1*delta_time)
+                if self.power_meter < 0:
+                    self.power_meter_direction = "Up"
+            self.power_meter_display.text = f"{self.power_meter:.1f}"
+
+        #Second click freezes shot meter and displays power.
+
+        #Third click starts accuracy bar.  -50 = Hard Left, +50 = Hard Right
+        elif self.shot_meter_stage == 3:
+            self.power_meter = self.power_meter
+            self.power_meter_display.text = f"{self.power_meter:.1f}"
+            if self.accuracy_meter_direction == "Up":
+                self.accuracy_meter +=.75+(1*delta_time)
+                if self.accuracy_meter > 50:
+                    self.accuracy_meter_direction = "Down"
+            elif self.accuracy_meter_direction == "Down":
+                self.accuracy_meter -=.75+(1*delta_time)
+                if self.accuracy_meter < -50:
+                    self.accuracy_meter_direction = "Up"
+            self.accuracy_meter_display.text = f"{self.accuracy_meter:.1f}"        
+            #Need to do math
+    
+        elif self.shot_meter_stage == 0:
+            #Resets meters
+            self.power_meter = 0
+            self.accuracy_meter = 0
+            self.power_meter_display.text = f"{self.power_meter:.1f}"
+            self.accuracy_meter_display.text = f"{self.accuracy_meter:.1f}"
 
     def calculate_aim(self, x, y):
         '''
@@ -122,7 +119,7 @@ class GolfBall():
         max_offset_degrees = 15
         offset_degrees = (self.accuracy_meter / 50) * max_offset_degrees
         adjusted_angle = self.radians + math.radians(offset_degrees)
-        log.info(f'Angle = {math.degrees(self.radians)}, Speed = {self.power_meter}, Accuracy = {self.accuracy_meter}, Adjusted angle = {math.degrees(adjusted_angle)}.')
+        log.debug(f'Angle = {math.degrees(self.radians)}, Speed = {self.power_meter}, Accuracy = {self.accuracy_meter}, Adjusted angle = {math.degrees(adjusted_angle)}.')
 
         self.vx = math.cos(adjusted_angle) * self.power_meter * 5
         self.vy = math.sin(adjusted_angle) * self.power_meter * 5
@@ -157,7 +154,7 @@ class GolfBall():
             self.vx = self.vx * FRICTION
 
         #Stops ball once it slows below a certain speed.  If I go higher than 3, it seems to break the collision logic.
-        if self.vy < abs(3) and self.vx < abs(3):
+        if abs(self.vy) < 1 and abs(self.vx) < 1:
             self.cx += 0
             self.cy += 0
             self.vy = self.vx = 0
@@ -175,17 +172,17 @@ class GolfBall():
             self.near_sides = (self.cx - self.radius) < left or (self.cx + self.radius) > (left+width)
             self.near_top_bottom = (self.cy - self.radius) < bottom or (self.cy + self.radius) > (bottom+height)
 
-            if self.near_sides:
+            if self.near_sides and not self.last_near_sides:
                 log.debug("near sides")
-                self.vx = -1 * self.vx
+                self.vx = -1.1 * self.vx
                 log.debug(f"new vx = {self.vx}")
-            if self.near_top_bottom:
+            if self.near_top_bottom and not self.last_near_top_bottom:
                 log.debug("near top/bottom")
-                self.vy = -1 * self.vy
+                self.vy = -1.1 * self.vy
                 log.debug(f"new_vy = {self.vy}")
-            else:
-                pass
 
+            self.last_near_sides = self.near_sides
+            self.last_near_top_bottom = self.near_top_bottom
 
 class Level():
     def __init__(self):
@@ -229,9 +226,7 @@ class GameView(arcade.Window):
         gbx = self.level.rooms[0].left + 40
         gby = self.level.rooms[0].bottom + 40
         
-        self.golf_ball = GolfBall(gbx,gby)    
- 
-        
+        self.golf_ball = GolfBall(gbx,gby)          
 
     def on_update(self, delta_time) -> None:
 
@@ -240,17 +235,15 @@ class GameView(arcade.Window):
 
         if self.timer:
             self.timer += 1*delta_time
-            self.test_text.text = f"{self.timer}"
-
+  
         if self.timer > 2.25:
             self.timer = 0
             self.golf_ball.apply_friction = True
             
-        log.debug(f"Friction = {self.golf_ball.apply_friction}")
         self.golf_ball.move_ball(delta_time)
         self.golf_ball.update_shot_meter(delta_time)
 
-
+        self.test_text.text = f"vx = {self.golf_ball.vx}, vy = {self.golf_ball.vy}"
 
     def on_draw(self):
         self.clear()
