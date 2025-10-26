@@ -184,25 +184,68 @@ class GolfBall():
             self.last_near_sides = self.near_sides
             self.last_near_top_bottom = self.near_top_bottom
 
+
+class Room():
+    def __init__(self):
+        self.left = 0
+        self.bottom = 0
+        self.width = 0
+        self.height = 0
+        self.right = self.left + self.width
+        self.top = self.bottom + self.height
+
+    def __iter__(self):
+        yield self.left
+        yield self.bottom
+        yield self.width
+        yield self.height
+
+    def create_room(self, left, bottom):
+
+        if left == "random":
+            self.left = random.randrange(50,300)
+        else:
+            self.left = left
+        if bottom == "random":
+            self.bottom = random.randrange(100,300)
+        else:
+            self.bottom = bottom
+        self.width = random.randrange(200, 320)
+        self.height = random.randrange(100,140)
+        self.right = self.left + self.width
+        self.top = self.bottom + self.height
+        log.info(f"Created room at: {self.left, self.bottom} that extends to {self.right, self.top}")
+        return self
+
+
+
 class Level():
     def __init__(self):
         self.rooms = []
-        self.create_room()
+        self.level_size = 4
+        self.build_level()
 
-    def create_room(self):
-        Room = nt("Room",["left","bottom", "width", "height"])
+    def build_level(self):
 
-        left = random.randrange(50,300)
-        bottom = random.randrange(100,300)
-        width = random.randrange(200,600)
-        height = random.randrange(100,400)
-        room =  Room(left, bottom, width, height)
-        self.rooms.append(room)
-        log.info(f"Created room at: {room.left, room.bottom} that extends to {room.left+room.width, room.bottom + room.height}")
+  
+        while len(self.rooms) < self.level_size:
+            if not self.rooms:
+                room = Room().create_room("random","random")
+                self.rooms.append(room)
+            else:
+                previous_room = self.rooms[-1]  
+                left = random.randrange(previous_room.left,previous_room.right)
+                bottom = random.randrange(previous_room.bottom, previous_room.top)
+                room = Room().create_room(left, bottom)
+                self.rooms.append(room)
 
+
+        
     def draw_room(self):
         for room in self.rooms:
             arcade.draw_lbwh_rectangle_filled(*room,color=arcade.color.GRANNY_SMITH_APPLE)
+
+
 
 
 class GameView(arcade.Window):
@@ -214,6 +257,7 @@ class GameView(arcade.Window):
         #Call to set up window:
         super().__init__(SCREEN_WIDTH,SCREEN_HEIGHT,WINDOW_TITLE)
         self.background_color = arcade.csscolor.BLACK
+        #allows debugging on screen
         self.test_text = arcade.Text("",x = 400, y = 400)
 
         self.timer = 0
@@ -243,7 +287,6 @@ class GameView(arcade.Window):
         self.golf_ball.move_ball(delta_time)
         self.golf_ball.update_shot_meter(delta_time)
 
-        self.test_text.text = f"vx = {self.golf_ball.vx}, vy = {self.golf_ball.vy}"
 
     def on_draw(self):
         self.clear()
