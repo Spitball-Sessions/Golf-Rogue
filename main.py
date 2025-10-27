@@ -1,4 +1,5 @@
-import arcade, logging, random, math
+import arcade, logging, random, math, shapely
+from shapely.geometry import Point, Polygon
 from collections import namedtuple as nt
 
 #CONSTANTs
@@ -193,6 +194,7 @@ class Room():
         self.height = 0
         self.right = self.left + self.width
         self.top = self.bottom + self.height
+        self.box = None
 
     def __iter__(self):
         yield self.left
@@ -214,7 +216,10 @@ class Room():
         self.height = random.randrange(100,140)
         self.right = self.left + self.width
         self.top = self.bottom + self.height
-        log.info(f"Created room at: {self.left, self.bottom} that extends to {self.right, self.top}")
+        log.debug(f"Created room at: {self.left, self.bottom} that extends to {self.right, self.top}")
+        
+        self.box = shapely.box(self.left, self.bottom, self.right, self.top)
+        log.info(f"self.box = {self.box}")
         return self
 
 
@@ -222,6 +227,8 @@ class Room():
 class Level():
     def __init__(self):
         self.rooms = []
+        self.polygon = []
+        self.joined_shape = None
         self.level_size = 4
         self.build_level()
 
@@ -232,12 +239,18 @@ class Level():
             if not self.rooms:
                 room = Room().create_room("random","random")
                 self.rooms.append(room)
+                self.polygon.append(room.box)
+
             else:
                 previous_room = self.rooms[-1]  
                 left = random.randrange(previous_room.left,previous_room.right)
                 bottom = random.randrange(previous_room.bottom, previous_room.top)
                 room = Room().create_room(left, bottom)
                 self.rooms.append(room)
+                self.polygon.append(room.box)
+        
+        self.joined_shape = shapely.unary_union(self.polygon)
+        log.info(self.joined_shape)
 
 
         
