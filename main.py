@@ -1,4 +1,5 @@
 import arcade, logging, random, math, shapely
+from shapely import covers, contains
 from shapely.geometry import Point, Polygon
 from collections import namedtuple as nt
 
@@ -35,6 +36,7 @@ class GolfBall():
         self.circumference = 2*math.pi*self.radius
         self.area = math.pi*(self.radius*self.radius)
         self.position = arcade.Text(f"Position: ({self.cx},{self.cy})", x = 20, y = SCREEN_HEIGHT - 20)
+
 
         log.info(f"Golf ball created. " + ", ".join(f"{k} = {v}" for k,v in vars(self).items() if isinstance(v,( int,float))))
    
@@ -148,6 +150,7 @@ class GolfBall():
 
         self.cx += self.vx * delta_time 
         self.cy += self.vy * delta_time
+        
 
         #Slows ball by Friction constant.  self.apply_friction = true after 2.25 seconds
         if self.apply_friction:
@@ -163,27 +166,26 @@ class GolfBall():
         
         log.debug(f"vx = {self.vx}, vy = {self.vy}")
 
-    def handle_collisions(self, left, bottom, width, height):
+    def handle_collisions(self, shape):
             """
             If collision detected, this inverts the velocity for the direction collision is detected on.
             Dual if's allow for handling corners.
             """
-            self.position.text = f"Position: ({self.cx},{self.cy})"
+            point = Point(self.cx, self.cy)
+            playable_area = shape.buffer(-self.radius)
+            self.position.text = f"Position: ({point})"
+            
 
-            self.near_sides = (self.cx - self.radius) < left or (self.cx + self.radius) > (left+width)
-            self.near_top_bottom = (self.cy - self.radius) < bottom or (self.cy + self.radius) > (bottom+height)
+            if not playable_area.covers(point):
+                log.info("This triggered")
+                nearest = shape.exterior.interpolate(shape.exterior.project(point))
+                near_x = point.x - nearest.x
+                near_y = point.y - nearest.y
+                if abs(near_x) > abs(near_y):
+                    self.vx *= -1
+                else:
+                    self.vy *= -1
 
-            if self.near_sides and not self.last_near_sides:
-                log.debug("near sides")
-                self.vx = -1.1 * self.vx
-                log.debug(f"new vx = {self.vx}")
-            if self.near_top_bottom and not self.last_near_top_bottom:
-                log.debug("near top/bottom")
-                self.vy = -1.1 * self.vy
-                log.debug(f"new_vy = {self.vy}")
-
-            self.last_near_sides = self.near_sides
-            self.last_near_top_bottom = self.near_top_bottom
 
 
 class Room():
@@ -219,7 +221,6 @@ class Room():
         log.debug(f"Created room at: {self.left, self.bottom} that extends to {self.right, self.top}")
         
         self.box = shapely.box(self.left, self.bottom, self.right, self.top)
-        log.info(f"self.box = {self.box}")
         return self
 
 
@@ -250,7 +251,7 @@ class Level():
                 self.polygon.append(room.box)
         
         self.joined_shape = shapely.unary_union(self.polygon)
-        log.info(self.joined_shape)
+        log.info(f"{self.joined_shape.is_empty} is empty")
 
 
         
@@ -287,8 +288,7 @@ class GameView(arcade.Window):
 
     def on_update(self, delta_time) -> None:
 
-        for room in self.level.rooms:
-            self.golf_ball.handle_collisions(*room)
+        self.golf_ball.handle_collisions(self.level.joined_shape)
 
         if self.timer:
             self.timer += 1*delta_time
